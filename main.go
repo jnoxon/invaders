@@ -3,8 +3,9 @@
 package main
 
 import (
-	"fmt"
 	"syscall/js"
+
+	"invaders/game"
 )
 
 const (
@@ -12,9 +13,14 @@ const (
 	logicalH = 224
 )
 
-var ctx js.Value
+var (
+	ctx js.Value
+	g   *game.Game
+)
 
 func main() {
+	g = game.NewGame()
+
 	obj := js.Global().Get("Object").New()
 	obj.Set("tick", js.FuncOf(tick))
 	obj.Set("setKey", js.FuncOf(setKey))
@@ -23,11 +29,11 @@ func main() {
 	canvas := js.Global().Get("document").Call("getElementById", "game")
 	ctx = canvas.Call("getContext", "2d")
 
-	fmt.Println("invaders: ready")
 	select {}
 }
 
 func tick(this js.Value, args []js.Value) any {
+	g.Tick()
 	ctx.Call("fillStyle", "#000000")
 	ctx.Call("fillRect", 0, 0, logicalW, logicalH)
 	return nil
@@ -36,6 +42,6 @@ func tick(this js.Value, args []js.Value) any {
 func setKey(this js.Value, args []js.Value) any {
 	code := args[0].String()
 	pressed := args[1].Bool()
-	fmt.Printf("key %s %v\n", code, pressed)
+	g.HandleInput(code, pressed)
 	return nil
 }
