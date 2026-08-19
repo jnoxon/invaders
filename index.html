@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Space Invaders</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #game {
+    background: #000;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    box-shadow: 0 0 48px rgba(0,0,0,0.8);
+  }
+  #loading { position: fixed; top: 10px; left: 12px; color: #7f7; font: 12px/1.4 monospace; }
+</style>
+</head>
+<body>
+<canvas id="game" width="256" height="224"></canvas>
+<div id="loading">Loading...</div>
+<script src="wasm_exec.js"></script>
+<script type="module">
+  const W = 256, H = 224;
+  const canvas = document.getElementById("game");
+  const loading = document.getElementById("loading");
+
+  function fit() {
+    const s = Math.max(1, Math.min(
+      Math.floor((window.innerWidth - 32) / W),
+      Math.floor((window.innerHeight - 32) / H),
+    ));
+    canvas.style.width = (W * s) + "px";
+    canvas.style.height = (H * s) + "px";
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  const handled = new Set([
+    "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+    "Space", "Enter", "KeyA", "KeyD", "KeyP",
+  ]);
+  window.addEventListener("keydown", (e) => {
+    if (!handled.has(e.code)) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (window.main) main.setKey(e.code, true);
+  });
+  window.addEventListener("keyup", (e) => {
+    if (!handled.has(e.code)) return;
+    e.preventDefault();
+    if (window.main) main.setKey(e.code, false);
+  });
+
+  const go = new Go();
+  const bytes = await (await fetch("main.wasm")).arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
+  go.run(instance);
+  loading.remove();
+
+  function frame() {
+    if (window.main) main.tick();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>
