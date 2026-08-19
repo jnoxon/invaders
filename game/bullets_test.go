@@ -68,9 +68,9 @@ func TestCountBullets(t *testing.T) {
 func TestPlayerLimitedToOneBullet(t *testing.T) {
 	g := newTestGame()
 	g.State = StatePlaying
-	g.Input.Fire = true
+	g.HandleInput("Space", true)
 	g.Tick()
-	g.Input.Fire = true
+	g.HandleInput("Space", true)
 	g.Tick()
 	if countBullets(g.Bullets, BulletPlayer) != 1 {
 		t.Fatalf("player bullets = %d, want 1", countBullets(g.Bullets, BulletPlayer))

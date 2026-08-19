@@ -10,7 +10,8 @@ all: build
 
 build:
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(WASM) .
-	cp $$(go env GOROOT)/lib/wasm/$(GLUE) $(GLUE)
+	cp -f $$(go env GOROOT)/lib/wasm/$(GLUE) $(GLUE)
+	chmod u+w $(GLUE)
 	@echo "built $(WASM) + $(GLUE)"
 
 test:

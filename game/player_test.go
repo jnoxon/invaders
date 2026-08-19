@@ -114,3 +114,26 @@ func TestPlayerRect(t *testing.T) {
 		t.Fatalf("rect = (%d,%d,%d,%d)", x, y, w, h)
 	}
 }
+
+func TestPlayerStopsWhenNoInput(t *testing.T) {
+	p := NewPlayer()
+	in := NewInputState()
+	x := p.X
+	p.Update(&in)
+	if p.X != x {
+		t.Fatalf("player moved with no input: %d -> %d", x, p.X)
+	}
+}
+
+func TestPlayerInvulnerableToEnemyBullet(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	g.Player.X = 100
+	g.Player.Invulnerable = RespawnInvuln
+	lives := g.Lives
+	g.Bullets = []Bullet{{X: 110, Y: PlayerY + 5, Owner: BulletEnemy, Active: true}}
+	g.CheckCollisions()
+	if g.Lives != lives {
+		t.Fatalf("lives = %d, want %d (invulnerable, should not be hit)", g.Lives, lives)
+	}
+}

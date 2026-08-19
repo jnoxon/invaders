@@ -108,7 +108,7 @@ func (g *Game) updatePlaying() {
 }
 
 func (g *Game) tryFire() {
-	if !g.Input.Fire || !g.Player.Alive {
+	if !g.Input.JustPressed["Space"] || !g.Player.Alive {
 		return
 	}
 	if countBullets(g.Bullets, BulletPlayer) >= MaxPlayerBullets {

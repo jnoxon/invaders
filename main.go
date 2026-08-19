@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"syscall/js"
 
 	"invaders/game"
@@ -34,8 +35,18 @@ func main() {
 
 func tick(this js.Value, args []js.Value) any {
 	g.Tick()
-	ctx.Call("fillStyle", "#000000")
+	ctx.Set("fillStyle", "#000000")
 	ctx.Call("fillRect", 0, 0, logicalW, logicalH)
+	ctx.Set("fillStyle", "#fff")
+	if g.Player.Alive {
+		ctx.Call("fillRect", g.Player.X, g.Player.Y, g.Player.W, g.Player.H)
+	}
+	for i := range g.Bullets {
+		b := &g.Bullets[i]
+		ctx.Call("fillRect", b.X, b.Y, game.BulletW, game.BulletH)
+	}
+	ctx.Set("font", "10px monospace")
+	ctx.Call("fillText", fmt.Sprintf("Score: %d", g.Score), 4, 12)
 	return nil
 }
 
