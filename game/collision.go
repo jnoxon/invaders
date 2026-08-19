@@ -43,7 +43,6 @@ func (g *Game) hitInvader(bx, by, bw, bh int) bool {
 			if AABB(bx, by, bw, bh, iv.X, iv.Y, InvaderW, InvaderH) {
 				iv.Alive = false
 				g.AddScore(iv.Type.Points())
-				g.levelKills++
 				return true
 			}
 		}

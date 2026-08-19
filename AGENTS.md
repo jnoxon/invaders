@@ -70,7 +70,7 @@ invaders/
 - 5 rows × 11 columns
 - 3 types (top row: squid 30pts, middle: crab 20pts, bottom: octopus 10pts)
 - Each invader is 20×15 pixels
-- Grid spacing: 24px horizontal, 24px vertical
+- Grid spacing: 22px horizontal, 24px vertical (grid is 240px wide; 24px horizontal would be 260px and not fit the 256px screen)
 - Movement: entire grid moves 1 step (8px) left/right
 - On reaching screen edge (4px margin), grid drops 8px and reverses
 - Speed increases as fewer invaders remain (fewer = faster)

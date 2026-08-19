@@ -43,9 +43,6 @@ func TestPlayerBulletKillsInvader(t *testing.T) {
 	if g.Bullets[0].Active {
 		t.Fatal("bullet should be consumed")
 	}
-	if g.levelKills != 1 {
-		t.Fatalf("levelKills = %d, want 1", g.levelKills)
-	}
 }
 
 func TestPlayerBulletMissesInvader(t *testing.T) {
@@ -122,6 +119,9 @@ func TestBulletHitsBarricade(t *testing.T) {
 func TestBulletHitsUFO(t *testing.T) {
 	g := newTestGame()
 	g.State = StatePlaying
+	// Clear the formation: the UFO shares the top rows with the grid, and
+	// hitInvader runs before the UFO check.
+	killAllBut(&g.Invaders, 0)
 	g.UFO = UFO{X: 100, Y: UFOY, Dir: 1, Active: true, Points: 100}
 	g.UFOActive = true
 	g.Bullets = []Bullet{{X: 110, Y: UFOY + 2, Owner: BulletPlayer, Active: true}}
@@ -141,5 +141,65 @@ func TestInvaderDestroysBarricadeOnOverlap(t *testing.T) {
 	g.checkInvaderBarricadeCollision()
 	if !bar.Destroyed() {
 		t.Fatal("overlapping invader should destroy barricade pixels")
+	}
+}
+
+func TestEnemyBulletBlockedByBarricade(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	lives := g.Lives
+	bar := g.Barricades[0]
+	sx := bar.X + 2
+	g.Bullets = []Bullet{{X: sx - 1, Y: bar.Y, Owner: BulletEnemy, Active: true}}
+	g.checkEnemyBulletHits()
+	if g.Bullets[0].Active {
+		t.Fatal("bullet should be consumed by barricade")
+	}
+	if g.Lives != lives {
+		t.Fatal("player should not lose a life")
+	}
+	if bar.Pixels[0][1] {
+		t.Fatal("barricade pixel should be damaged")
+	}
+}
+
+func TestMultipleBulletsSameFrame(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	iv1 := &g.Invaders.Invaders[0][0]
+	iv2 := &g.Invaders.Invaders[0][2]
+	g.Bullets = []Bullet{
+		{X: iv1.X + 5, Y: iv1.Y + 5, Owner: BulletPlayer, Active: true},
+		{X: iv2.X + 5, Y: iv2.Y + 5, Owner: BulletPlayer, Active: true},
+	}
+	g.checkPlayerBulletHits()
+	if iv1.Alive || iv2.Alive {
+		t.Fatal("both invaders should be dead")
+	}
+	if ActiveCount(g.Bullets, BulletPlayer) != 0 {
+		t.Fatal("both bullets should be consumed")
+	}
+	if g.Score != InvaderSquid.Points()*2 {
+		t.Fatalf("score = %d, want %d", g.Score, InvaderSquid.Points()*2)
+	}
+}
+
+func TestBulletHitsFirstTargetOnly(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	bar := &g.Barricades[0]
+	iv := &g.Invaders.Invaders[0][0]
+	iv.X = bar.X + 2
+	iv.Y = bar.Y - 5
+	g.Bullets = []Bullet{{X: iv.X + 5, Y: iv.Y + 10, Owner: BulletPlayer, Active: true}}
+	g.checkPlayerBulletHits()
+	if iv.Alive {
+		t.Fatal("invader should be dead")
+	}
+	if g.Bullets[0].Active {
+		t.Fatal("bullet should be consumed by invader")
+	}
+	if !bar.Pixels[2][4] {
+		t.Fatal("barricade should be undamaged (invader hit first)")
 	}
 }

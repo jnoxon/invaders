@@ -1,19 +1,25 @@
 package game
 
+import "math/rand/v2"
+
 const (
 	InvaderCols = 11
 	InvaderRows = 5
 	InvaderW    = 20
 	InvaderH    = 15
-	InvaderHGap = 24
+	InvaderHGap = 22
 	InvaderVGap = 24
 
-	invaderStep         = 8
+	// 2px (not the spec's 8px): the 240px-wide grid leaves only 8px of
+	// sweep room on the 256px screen, so an 8px step could never move
+	// horizontally without crossing the 4px edge margin.
+	invaderStep         = 2
 	invaderDrop         = 8
-	invaderBaseY        = 48
+	invaderBaseY        = 32
 	invaderLevelDrop    = 8
 	invaderMinY         = 16
 	invaderBaseInterval = 48
+	invaderMinInterval  = 4
 	EdgeMargin          = 4
 )
 
@@ -48,16 +54,19 @@ type InvaderGrid struct {
 	Dir          int
 	FrameCounter int
 	totalInitial int
+	rng          *rand.Rand
 }
 
-func NewInvaderGrid(level int) InvaderGrid {
-	var ig InvaderGrid
-	ig.Dir = 1
-	ig.totalInitial = InvaderRows * InvaderCols
+func NewInvaderGrid(level int, rng *rand.Rand) InvaderGrid {
+	ig := InvaderGrid{
+		Dir:          1,
+		totalInitial: InvaderRows * InvaderCols,
+		rng:          rng,
+	}
 	startX := (ScreenW - ((InvaderCols-1)*InvaderHGap + InvaderW)) / 2
 	startY := invaderStartY(level)
-	for r := 0; r < InvaderRows; r++ {
-		for c := 0; c < InvaderCols; c++ {
+	for r := range InvaderRows {
+		for c := range InvaderCols {
 			ig.Invaders[r][c] = Invader{
 				X:     startX + c*InvaderHGap,
 				Y:     startY + r*InvaderVGap,
@@ -88,35 +97,50 @@ func invaderTypeForRow(r int) InvaderType {
 	}
 }
 
-func (ig *InvaderGrid) Update() {
+// Update advances the grid by one frame. Returns true if the grid stepped.
+func (ig *InvaderGrid) Update() bool {
 	if ig.AliveCount() == 0 {
-		return
+		return false
 	}
 	ig.FrameCounter++
 	if ig.FrameCounter < ig.StepInterval() {
-		return
+		return false
 	}
 	ig.FrameCounter = 0
 	ig.toggleAnim()
 
 	left, right := ig.bounds()
-	drop := false
-	if ig.Dir > 0 && right+InvaderW > ScreenW-EdgeMargin {
+	if ig.Dir > 0 && right+invaderStep > ScreenW-EdgeMargin-InvaderW {
+		ig.moveY(invaderDrop)
 		ig.Dir = -1
-		drop = true
-	} else if ig.Dir < 0 && left < EdgeMargin {
-		ig.Dir = 1
-		drop = true
+		return true
 	}
+	if ig.Dir < 0 && left-invaderStep < EdgeMargin {
+		ig.moveY(invaderDrop)
+		ig.Dir = 1
+		return true
+	}
+	ig.moveX(ig.Dir * invaderStep)
+	return true
+}
+
+func (ig *InvaderGrid) moveX(dx int) {
 	for r := range ig.Invaders {
 		for c := range ig.Invaders[r] {
 			iv := &ig.Invaders[r][c]
-			if !iv.Alive {
-				continue
+			if iv.Alive {
+				iv.X += dx
 			}
-			iv.X += ig.Dir * invaderStep
-			if drop {
-				iv.Y += invaderDrop
+		}
+	}
+}
+
+func (ig *InvaderGrid) moveY(dy int) {
+	for r := range ig.Invaders {
+		for c := range ig.Invaders[r] {
+			iv := &ig.Invaders[r][c]
+			if iv.Alive {
+				iv.Y += dy
 			}
 		}
 	}
@@ -170,13 +194,33 @@ func (ig *InvaderGrid) AliveCount() int {
 func (ig *InvaderGrid) StepInterval() int {
 	alive := ig.AliveCount()
 	if alive <= 0 {
-		return 1
+		return invaderMinInterval
 	}
 	iv := invaderBaseInterval * alive / ig.totalInitial
-	if iv < 1 {
-		iv = 1
+	if iv < invaderMinInterval {
+		iv = invaderMinInterval
 	}
 	return iv
+}
+
+// ShouldShoot reports whether the grid fires this step.
+// Probability is inversely proportional to the step interval (faster = more likely).
+func (ig *InvaderGrid) ShouldShoot() bool {
+	return ig.rng.IntN(2*ig.StepInterval()) < invaderBaseInterval
+}
+
+// PickShooter returns the bottom-most alive invader of a random non-empty column.
+func (ig *InvaderGrid) PickShooter() *Invader {
+	if ig.AliveCount() == 0 {
+		return nil
+	}
+	col := ig.rng.IntN(InvaderCols)
+	for {
+		if iv := ig.BottomOfColumn(col); iv != nil {
+			return iv
+		}
+		col = (col + 1) % InvaderCols
+	}
 }
 
 func (ig *InvaderGrid) BottomOfColumn(col int) *Invader {
@@ -201,34 +245,4 @@ func (ig *InvaderGrid) ReachedBottom() bool {
 		}
 	}
 	return false
-}
-
-func (g *Game) enemyFire() {
-	if countBullets(g.Bullets, BulletEnemy) >= MaxEnemyBullets {
-		return
-	}
-	alive := g.Invaders.AliveCount()
-	if alive == 0 {
-		return
-	}
-	g.enemyFireCounter++
-	interval := invaderBaseInterval * alive / (InvaderRows * InvaderCols)
-	if interval < 1 {
-		interval = 1
-	}
-	if g.enemyFireCounter < interval {
-		return
-	}
-	g.enemyFireCounter = 0
-	col := g.RNG.Intn(InvaderCols)
-	iv := g.Invaders.BottomOfColumn(col)
-	if iv == nil {
-		return
-	}
-	g.Bullets = append(g.Bullets, Bullet{
-		X:      iv.X + InvaderW/2,
-		Y:      iv.Y + InvaderH,
-		Owner:  BulletEnemy,
-		Active: true,
-	})
 }

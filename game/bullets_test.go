@@ -50,17 +50,17 @@ func TestBulletRect(t *testing.T) {
 	}
 }
 
-func TestCountBullets(t *testing.T) {
+func TestActiveCount(t *testing.T) {
 	bullets := []Bullet{
 		{Owner: BulletPlayer, Active: true},
 		{Owner: BulletPlayer, Active: false},
 		{Owner: BulletEnemy, Active: true},
 		{Owner: BulletEnemy, Active: false},
 	}
-	if countBullets(bullets, BulletPlayer) != 1 {
+	if ActiveCount(bullets, BulletPlayer) != 1 {
 		t.Fatal("player bullet count wrong")
 	}
-	if countBullets(bullets, BulletEnemy) != 1 {
+	if ActiveCount(bullets, BulletEnemy) != 1 {
 		t.Fatal("enemy bullet count wrong (should ignore inactive)")
 	}
 }
@@ -72,21 +72,35 @@ func TestPlayerLimitedToOneBullet(t *testing.T) {
 	g.Tick()
 	g.HandleInput("Space", true)
 	g.Tick()
-	if countBullets(g.Bullets, BulletPlayer) != 1 {
-		t.Fatalf("player bullets = %d, want 1", countBullets(g.Bullets, BulletPlayer))
+	if ActiveCount(g.Bullets, BulletPlayer) != 1 {
+		t.Fatalf("player bullets = %d, want 1", ActiveCount(g.Bullets, BulletPlayer))
 	}
 }
 
-func TestEnemyFireRespectsMax(t *testing.T) {
+func TestCanFireRespectsMax(t *testing.T) {
 	g := newTestGame()
-	g.State = StatePlaying
+	if !CanFire(g.Bullets, BulletPlayer) || !CanFire(g.Bullets, BulletEnemy) {
+		t.Fatal("should be able to fire with no bullets")
+	}
+	g.Bullets = []Bullet{{Owner: BulletPlayer, Active: false}}
+	if !CanFire(g.Bullets, BulletPlayer) {
+		t.Fatal("inactive bullets should not block firing")
+	}
+	g.Bullets = []Bullet{{Owner: BulletPlayer, Active: true}}
+	if CanFire(g.Bullets, BulletPlayer) {
+		t.Fatal("player at max should not fire")
+	}
+	if !CanFire(g.Bullets, BulletEnemy) {
+		t.Fatal("enemy should still be able to fire")
+	}
 	g.Bullets = make([]Bullet, MaxEnemyBullets)
 	for i := range g.Bullets {
 		g.Bullets[i] = Bullet{Owner: BulletEnemy, Active: true}
 	}
-	before := len(g.Bullets)
-	g.enemyFire()
-	if len(g.Bullets) != before {
-		t.Fatal("should not fire beyond max enemy bullets")
+	if CanFire(g.Bullets, BulletEnemy) {
+		t.Fatal("enemy at max should not fire")
+	}
+	if !CanFire(g.Bullets, BulletPlayer) {
+		t.Fatal("player should still be able to fire")
 	}
 }

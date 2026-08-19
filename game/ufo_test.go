@@ -1,14 +1,14 @@
 package game
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"testing"
 )
 
 var validUFOPoints = map[int]bool{50: true, 100: true, 150: true, 300: true}
 
 func TestNewUFOValid(t *testing.T) {
-	rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewPCG(1, 1))
 	for i := 0; i < 50; i++ {
 		u := NewUFO(rng)
 		if u.Dir != 1 && u.Dir != -1 {
@@ -27,7 +27,7 @@ func TestNewUFOValid(t *testing.T) {
 }
 
 func TestUFOStartsOffScreen(t *testing.T) {
-	rng := rand.New(rand.NewSource(2))
+	rng := rand.New(rand.NewPCG(1, 2))
 	for i := 0; i < 50; i++ {
 		u := NewUFO(rng)
 		if u.Dir > 0 && u.X >= 0 {

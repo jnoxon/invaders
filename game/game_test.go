@@ -1,14 +1,18 @@
 package game
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"testing"
 )
 
 func newTestGame() *Game {
 	g := NewGame()
-	g.RNG = rand.New(rand.NewSource(42))
+	g.RNG = rand.New(rand.NewPCG(1, 42))
 	return g
+}
+
+func testRNG() *rand.Rand {
+	return rand.New(rand.NewPCG(1, 42))
 }
 
 func TestNewGameInitialState(t *testing.T) {
@@ -128,6 +132,70 @@ func TestPauseToggle(t *testing.T) {
 		t.Fatalf("state = %v, want StatePaused", g.State)
 	}
 	g.HandleInput("KeyP", true)
+	if g.State != StatePlaying {
+		t.Fatalf("state = %v, want StatePlaying", g.State)
+	}
+}
+
+func TestFullGameLoop200Frames(t *testing.T) {
+	g := newTestGame()
+	g.HandleInput("Enter", true)
+	g.Tick()
+	if g.State != StatePlaying {
+		t.Fatalf("state = %v, want StatePlaying", g.State)
+	}
+	// Keep the player invulnerable so enemy fire can't end the sim early.
+	g.Player.Invulnerable = 300
+	y0 := g.Invaders.Invaders[InvaderRows-1][0].Y
+	for range 200 {
+		g.Tick()
+	}
+	if g.State != StatePlaying {
+		t.Fatalf("state = %v after 200 frames, want StatePlaying", g.State)
+	}
+	if g.Invaders.Invaders[InvaderRows-1][0].Y != y0+invaderDrop {
+		t.Fatalf("invader y = %d, want %d (one edge drop in 200 frames)",
+			g.Invaders.Invaders[InvaderRows-1][0].Y, y0+invaderDrop)
+	}
+	g.HandleInput("Space", true)
+	g.Tick()
+	if ActiveCount(g.Bullets, BulletPlayer) != 1 {
+		t.Fatal("player bullet should be in flight after firing")
+	}
+}
+
+func TestLevelCompleteTriggersTransition(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	for r := range g.Invaders.Invaders {
+		for c := range g.Invaders.Invaders[r] {
+			g.Invaders.Invaders[r][c].Alive = false
+		}
+	}
+	g.Tick()
+	if g.State != StateLevelTransition {
+		t.Fatalf("state = %v, want StateLevelTransition", g.State)
+	}
+	if g.TransitionTimer != TransitionFrames {
+		t.Fatalf("transition timer = %d, want %d", g.TransitionTimer, TransitionFrames)
+	}
+}
+
+func TestUFOSpawnAfterExpectedFrames(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	// Invulnerable so the long sim can't end in a game over.
+	g.Player.Invulnerable = UFOSpawnFrames + 100
+	for i := range UFOSpawnFrames - 1 {
+		g.Tick()
+		if g.UFOActive {
+			t.Fatalf("UFO active at frame %d, want %d", i+1, UFOSpawnFrames)
+		}
+	}
+	g.Tick()
+	if !g.UFOActive {
+		t.Fatal("UFO should be active after UFOSpawnFrames")
+	}
 	if g.State != StatePlaying {
 		t.Fatalf("state = %v, want StatePlaying", g.State)
 	}

@@ -25,8 +25,8 @@ vet:
 	else go vet $$pkgs; fi
 
 serve:
-	@echo "serving on http://localhost:$(PORT) (ctrl-c to stop)"
-	python3 -m http.server $(PORT)
+	@echo "serving on http://0.0.0.0:$(PORT) (ctrl-c to stop)"
+	python3 -m http.server $(PORT) --bind 0.0.0.0
 
 clean:
 	rm -f $(WASM) $(GLUE)

@@ -1,7 +1,7 @@
 package game
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -41,14 +41,13 @@ type Game struct {
 	RNG             *rand.Rand
 	Input           InputState
 
-	levelKills       int
-	enemyFireCounter int
+	ufoTimer int
 }
 
 func NewGame() *Game {
 	g := &Game{
 		State:     StateStart,
-		RNG:       rand.New(rand.NewSource(time.Now().UnixNano())),
+		RNG:       rand.New(rand.NewPCG(1, uint64(time.Now().UnixNano()))),
 		Score:     0,
 		HighScore: 0,
 		Lives:     StartLives,
@@ -56,7 +55,7 @@ func NewGame() *Game {
 		Input:     NewInputState(),
 	}
 	g.Player = NewPlayer()
-	g.Invaders = NewInvaderGrid(1)
+	g.Invaders = NewInvaderGrid(1, g.RNG)
 	g.Barricades = newBarricades()
 	return g
 }
@@ -88,10 +87,11 @@ func (g *Game) Tick() {
 func (g *Game) updatePlaying() {
 	g.Player.Update(&g.Input)
 	g.tryFire()
-	g.Invaders.Update()
+	if g.Invaders.Update() && g.Invaders.ShouldShoot() {
+		g.enemyShoot()
+	}
 	g.updateBullets()
 	g.updateUFO()
-	g.enemyFire()
 	g.CheckCollisions()
 
 	if g.Player.Invulnerable > 0 {
@@ -111,12 +111,28 @@ func (g *Game) tryFire() {
 	if !g.Input.JustPressed["Space"] || !g.Player.Alive {
 		return
 	}
-	if countBullets(g.Bullets, BulletPlayer) >= MaxPlayerBullets {
+	if !CanFire(g.Bullets, BulletPlayer) {
 		return
 	}
 	if b := g.Player.Fire(); b != nil {
 		g.Bullets = append(g.Bullets, *b)
 	}
+}
+
+func (g *Game) enemyShoot() {
+	if !CanFire(g.Bullets, BulletEnemy) {
+		return
+	}
+	iv := g.Invaders.PickShooter()
+	if iv == nil {
+		return
+	}
+	g.Bullets = append(g.Bullets, Bullet{
+		X:      iv.X + InvaderW/2 - BulletW/2,
+		Y:      iv.Y + InvaderH,
+		Owner:  BulletEnemy,
+		Active: true,
+	})
 }
 
 func (g *Game) updateBullets() {
@@ -135,16 +151,19 @@ func (g *Game) updateBullets() {
 }
 
 func (g *Game) updateUFO() {
-	if !g.UFOActive {
-		if g.levelKills >= UFOKillThreshold {
-			g.UFO = NewUFO(g.RNG)
-			g.UFOActive = true
+	if g.UFOActive {
+		g.UFO.Update()
+		if !g.UFO.Active {
+			g.UFOActive = false
+			g.ufoTimer = 0
 		}
 		return
 	}
-	g.UFO.Update()
-	if !g.UFO.Active {
-		g.UFOActive = false
+	g.ufoTimer++
+	if g.ufoTimer >= UFOSpawnFrames {
+		g.ufoTimer = 0
+		g.UFO = NewUFO(g.RNG)
+		g.UFOActive = true
 	}
 }
 
@@ -164,13 +183,12 @@ func (g *Game) ResetLevel() {
 }
 
 func (g *Game) resetLevelEntities() {
-	g.Invaders = NewInvaderGrid(g.Level)
+	g.Invaders = NewInvaderGrid(g.Level, g.RNG)
 	g.Barricades = newBarricades()
 	g.Bullets = g.Bullets[:0]
 	g.UFO = UFO{}
 	g.UFOActive = false
-	g.levelKills = 0
-	g.enemyFireCounter = 0
+	g.ufoTimer = 0
 }
 
 func (g *Game) HandleInput(code string, pressed bool) {

@@ -23,8 +23,6 @@ func (s *InputState) Update(code string, pressed bool) {
 	}
 	if pressed {
 		s.JustPressed[code] = true
-	} else {
-		delete(s.JustPressed, code)
 	}
 }
 

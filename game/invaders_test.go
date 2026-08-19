@@ -16,8 +16,25 @@ func placeAll(ig *InvaderGrid, x, y int) {
 	}
 }
 
+func newTestGrid() InvaderGrid {
+	return NewInvaderGrid(1, testRNG())
+}
+
+func killAllBut(ig *InvaderGrid, n int) {
+	count := 0
+	for r := range ig.Invaders {
+		for c := range ig.Invaders[r] {
+			if count < n {
+				count++
+				continue
+			}
+			ig.Invaders[r][c].Alive = false
+		}
+	}
+}
+
 func TestNewInvaderGridInit(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	if ig.AliveCount() != InvaderRows*InvaderCols {
 		t.Fatalf("alive = %d", ig.AliveCount())
 	}
@@ -42,8 +59,8 @@ func TestNewInvaderGridInit(t *testing.T) {
 }
 
 func TestHigherLevelStartsHigher(t *testing.T) {
-	l1 := NewInvaderGrid(1)
-	l3 := NewInvaderGrid(3)
+	l1 := newTestGrid()
+	l3 := NewInvaderGrid(3, testRNG())
 	if l3.Invaders[0][0].Y >= l1.Invaders[0][0].Y {
 		t.Fatalf("level 3 y=%d not higher than level 1 y=%d",
 			l3.Invaders[0][0].Y, l1.Invaders[0][0].Y)
@@ -51,7 +68,7 @@ func TestHigherLevelStartsHigher(t *testing.T) {
 }
 
 func TestInvaderMovesRight(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	placeAll(&ig, 10, 50)
 	ig.Dir = 1
 	before := ig.Invaders[0][0].X
@@ -64,9 +81,9 @@ func TestInvaderMovesRight(t *testing.T) {
 	}
 }
 
-func TestInvaderWrapsAtRightEdge(t *testing.T) {
-	ig := NewInvaderGrid(1)
-	placeAll(&ig, 240, 50)
+func TestInvaderDropsAtRightEdge(t *testing.T) {
+	ig := newTestGrid()
+	placeAll(&ig, 232, 50)
 	ig.Dir = 1
 	yBefore := ig.Invaders[0][0].Y
 	forceStep(&ig)
@@ -76,26 +93,46 @@ func TestInvaderWrapsAtRightEdge(t *testing.T) {
 	if ig.Invaders[0][0].Y != yBefore+invaderDrop {
 		t.Fatal("should drop at edge")
 	}
-	if ig.Invaders[0][0].X != 240-invaderStep {
-		t.Fatal("should move left after reversing")
+	if ig.Invaders[0][0].X != 232 {
+		t.Fatalf("x = %d, want 232 (stayed at edge, dropped instead of moving)", ig.Invaders[0][0].X)
 	}
 }
 
-func TestInvaderReversesAtLeftEdge(t *testing.T) {
-	ig := NewInvaderGrid(1)
-	placeAll(&ig, 0, 50)
+func TestInvaderDropsAtLeftEdge(t *testing.T) {
+	ig := newTestGrid()
+	placeAll(&ig, 4, 50)
 	ig.Dir = -1
+	yBefore := ig.Invaders[0][0].Y
 	forceStep(&ig)
 	if ig.Dir != 1 {
 		t.Fatal("dir should reverse to 1")
 	}
-	if ig.Invaders[0][0].X != invaderStep {
-		t.Fatalf("x = %d, want %d", ig.Invaders[0][0].X, invaderStep)
+	if ig.Invaders[0][0].Y != yBefore+invaderDrop {
+		t.Fatal("should drop at edge")
+	}
+	if ig.Invaders[0][0].X != 4 {
+		t.Fatalf("x = %d, want 4 (stayed at edge, dropped instead of moving)", ig.Invaders[0][0].X)
+	}
+}
+
+func TestFullMovementCycle(t *testing.T) {
+	ig := newTestGrid()
+	x0 := ig.Invaders[0][0].X
+	y0 := ig.Invaders[0][0].Y
+	// One full sweep: right to the edge, drop, left to the edge, drop.
+	for range 10 {
+		forceStep(&ig)
+	}
+	if ig.Invaders[0][0].X != x0 {
+		t.Fatalf("x = %d, want %d after full cycle", ig.Invaders[0][0].X, x0)
+	}
+	if ig.Invaders[0][0].Y != y0+2*invaderDrop {
+		t.Fatalf("y = %d, want %d after full cycle", ig.Invaders[0][0].Y, y0+2*invaderDrop)
 	}
 }
 
 func TestInvaderStepIntervalDecreases(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	full := ig.StepInterval()
 	for r := range ig.Invaders {
 		for c := range ig.Invaders[r] {
@@ -110,23 +147,28 @@ func TestInvaderStepIntervalDecreases(t *testing.T) {
 	}
 }
 
-func TestInvaderStepIntervalNeverBelowOne(t *testing.T) {
-	ig := NewInvaderGrid(1)
-	ig.Invaders[0][0].Alive = true
-	for r := range ig.Invaders {
-		for c := range ig.Invaders[r] {
-			if r != 0 || c != 0 {
-				ig.Invaders[r][c].Alive = false
-			}
-		}
+func TestStepIntervalByAliveCount(t *testing.T) {
+	cases := []struct {
+		alive int
+		want  int
+	}{
+		{55, 48},
+		{27, 23},
+		{10, 8},
+		{4, 4},
+		{1, 4},
 	}
-	if ig.StepInterval() < 1 {
-		t.Fatal("interval must be >= 1")
+	for _, tc := range cases {
+		ig := newTestGrid()
+		killAllBut(&ig, tc.alive)
+		if got := ig.StepInterval(); got != tc.want {
+			t.Errorf("alive=%d: interval = %d, want %d", tc.alive, got, tc.want)
+		}
 	}
 }
 
 func TestInvaderAnimationToggle(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	placeAll(&ig, 10, 50)
 	before := ig.Invaders[0][0].AnimFrame
 	forceStep(&ig)
@@ -136,7 +178,7 @@ func TestInvaderAnimationToggle(t *testing.T) {
 }
 
 func TestInvaderNoStepBeforeInterval(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	placeAll(&ig, 10, 50)
 	ig.Update()
 	if ig.Invaders[0][0].X != 10 {
@@ -145,7 +187,7 @@ func TestInvaderNoStepBeforeInterval(t *testing.T) {
 }
 
 func TestBottomOfColumn(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	b := ig.BottomOfColumn(0)
 	if b == nil {
 		t.Fatal("expected bottom invader")
@@ -171,7 +213,7 @@ func TestBottomOfColumn(t *testing.T) {
 }
 
 func TestReachedBottom(t *testing.T) {
-	ig := NewInvaderGrid(1)
+	ig := newTestGrid()
 	if ig.ReachedBottom() {
 		t.Fatal("fresh grid should not have reached bottom")
 	}
@@ -184,5 +226,87 @@ func TestReachedBottom(t *testing.T) {
 func TestInvaderPoints(t *testing.T) {
 	if InvaderSquid.Points() != 30 || InvaderCrab.Points() != 20 || InvaderOctopus.Points() != 10 {
 		t.Fatal("invader points wrong")
+	}
+}
+
+func TestStepIntervalClampsToMin(t *testing.T) {
+	ig := newTestGrid()
+	killAllBut(&ig, 1)
+	if got := ig.StepInterval(); got != invaderMinInterval {
+		t.Fatalf("interval = %d, want min %d", got, invaderMinInterval)
+	}
+}
+
+func TestShouldShootProbability(t *testing.T) {
+	cases := []struct {
+		alive  int
+		trials int
+		min    int
+		max    int
+	}{
+		{55, 1000, 400, 600},
+		{1, 200, 200, 200},
+	}
+	for _, tc := range cases {
+		ig := newTestGrid()
+		killAllBut(&ig, tc.alive)
+		n := 0
+		for range tc.trials {
+			if ig.ShouldShoot() {
+				n++
+			}
+		}
+		if n < tc.min || n > tc.max {
+			t.Fatalf("alive=%d: %d/%d shots, want between %d and %d",
+				tc.alive, n, tc.trials, tc.min, tc.max)
+		}
+	}
+}
+
+func TestPickShooterBottomOfColumn(t *testing.T) {
+	ig := newTestGrid()
+	for c := range ig.Invaders[InvaderRows-1] {
+		ig.Invaders[InvaderRows-1][c].Alive = false
+	}
+	for range 100 {
+		iv := ig.PickShooter()
+		if iv == nil || !iv.Alive {
+			t.Fatal("expected an alive shooter")
+		}
+		col := -1
+		for c := range ig.Invaders[InvaderRows-2] {
+			if iv == &ig.Invaders[InvaderRows-2][c] {
+				col = c
+				break
+			}
+		}
+		if col < 0 {
+			t.Fatal("shooter should come from the new bottom row")
+		}
+		if ig.BottomOfColumn(col) != iv {
+			t.Fatalf("shooter is not the bottom-most invader of column %d", col)
+		}
+	}
+}
+
+func TestPickShooterSkipsEmptyColumns(t *testing.T) {
+	ig := newTestGrid()
+	for c := 0; c < InvaderCols-1; c++ {
+		for r := range ig.Invaders {
+			ig.Invaders[r][c].Alive = false
+		}
+	}
+	for range 50 {
+		if ig.PickShooter() != ig.BottomOfColumn(InvaderCols-1) {
+			t.Fatal("should always pick from the only non-empty column")
+		}
+	}
+}
+
+func TestPickShooterEmptyGrid(t *testing.T) {
+	ig := newTestGrid()
+	killAllBut(&ig, 0)
+	if ig.PickShooter() != nil {
+		t.Fatal("empty grid should return nil")
 	}
 }

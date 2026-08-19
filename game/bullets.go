@@ -43,7 +43,7 @@ func (b *Bullet) Rect() (int, int, int, int) {
 	return b.X, b.Y, BulletW, BulletH
 }
 
-func countBullets(bullets []Bullet, owner BulletOwner) int {
+func ActiveCount(bullets []Bullet, owner BulletOwner) int {
 	n := 0
 	for i := range bullets {
 		if bullets[i].Active && bullets[i].Owner == owner {
@@ -51,4 +51,15 @@ func countBullets(bullets []Bullet, owner BulletOwner) int {
 		}
 	}
 	return n
+}
+
+func maxBullets(owner BulletOwner) int {
+	if owner == BulletPlayer {
+		return MaxPlayerBullets
+	}
+	return MaxEnemyBullets
+}
+
+func CanFire(bullets []Bullet, owner BulletOwner) bool {
+	return ActiveCount(bullets, owner) < maxBullets(owner)
 }

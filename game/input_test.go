@@ -61,12 +61,12 @@ func TestInputFireEdgeTrigger(t *testing.T) {
 	g.State = StatePlaying
 	g.HandleInput("Space", true)
 	g.Tick()
-	if got := countBullets(g.Bullets, BulletPlayer); got != 1 {
+	if got := ActiveCount(g.Bullets, BulletPlayer); got != 1 {
 		t.Fatalf("after press: player bullets = %d, want 1", got)
 	}
 	g.Tick()
 	g.Tick()
-	if got := countBullets(g.Bullets, BulletPlayer); got != 1 {
+	if got := ActiveCount(g.Bullets, BulletPlayer); got != 1 {
 		t.Fatalf("while holding: player bullets = %d, want 1", got)
 	}
 }
@@ -80,6 +80,19 @@ func TestInputEnterJustPressed(t *testing.T) {
 	g.Tick()
 	if g.Input.JustPressed["Enter"] {
 		t.Fatal("Enter just-pressed should clear after tick")
+	}
+}
+
+func TestInputFastTapSurvivesKeyup(t *testing.T) {
+	g := newTestGame()
+	g.HandleInput("Enter", true)
+	g.HandleInput("Enter", false)
+	if !g.Input.JustPressed["Enter"] {
+		t.Fatal("fast tap (keydown+keyup before tick) must still register")
+	}
+	g.Tick()
+	if g.State != StatePlaying {
+		t.Fatalf("state after fast tap tick = %v, want StatePlaying", g.State)
 	}
 }
 
