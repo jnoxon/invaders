@@ -3,11 +3,12 @@ package game
 import "math/rand/v2"
 
 const (
-	UFOSpeed       = 2
-	UFOY           = 36
-	UFOW           = 40
-	UFOH           = 14
-	UFOSpawnFrames = 1200
+	UFOSpeed      = 2
+	UFOY          = 36
+	UFOW          = 40
+	UFOH          = 14
+	UFOSpawnKills = 20
+	UFOMinAlive   = 10
 )
 
 var ufoPoints = []int{50, 100, 150, 300}
@@ -16,7 +17,17 @@ type UFO struct {
 	X, Y   int
 	Dir    int
 	Active bool
-	Points int
+	points int
+}
+
+// CanSpawn reports whether a new UFO may be spawned: none active and at
+// least UFOMinAlive invaders remain on screen (original rule).
+func (u *UFO) CanSpawn(aliveInvaders int) bool {
+	return !u.Active && aliveInvaders >= UFOMinAlive
+}
+
+func (u *UFO) Points() int {
+	return u.points
 }
 
 func NewUFO(rng *rand.Rand) UFO {
@@ -33,7 +44,7 @@ func NewUFO(rng *rand.Rand) UFO {
 		Y:      UFOY,
 		Dir:    dir,
 		Active: true,
-		Points: ufoPoints[rng.IntN(len(ufoPoints))],
+		points: ufoPoints[rng.IntN(len(ufoPoints))],
 	}
 }
 

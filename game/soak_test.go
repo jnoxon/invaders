@@ -26,8 +26,8 @@ func TestSoakMultiSeed(t *testing.T) {
 		turn := in.IntN(20) + 10
 		restarts := 0
 		ufoSeen := false
+		maxKills := 0
 		levelSeen := 1
-		playStreak := 0
 		resumeAt := 0
 
 		for frame := 0; frame < framesPerGame && restarts < maxGamesPerSeed; frame++ {
@@ -63,10 +63,8 @@ func TestSoakMultiSeed(t *testing.T) {
 			if g.UFOActive {
 				ufoSeen = true
 			}
-			if g.State == StatePlaying {
-				playStreak++
-			} else {
-				playStreak = 0
+			if g.KillCount > maxKills {
+				maxKills = g.KillCount
 			}
 			if g.Level > levelSeen {
 				levelSeen = g.Level
@@ -80,8 +78,8 @@ func TestSoakMultiSeed(t *testing.T) {
 		if restarts == 0 {
 			t.Fatalf("seed %d: expected at least one game over in %d frames", seed, framesPerGame)
 		}
-		if playStreak > UFOSpawnFrames+50 && !ufoSeen {
-			t.Fatalf("seed %d: game survived %d frames without UFO", seed, playStreak)
+		if maxKills >= UFOSpawnKills && !ufoSeen {
+			t.Fatalf("seed %d: reached %d kills without UFO", seed, maxKills)
 		}
 		if g.Lives < 0 || g.Lives > StartLives {
 			t.Fatalf("seed %d: lives out of range: %d", seed, g.Lives)
@@ -111,6 +109,7 @@ func TestSoakLongGame(t *testing.T) {
 		dir := 1
 		turn := in.IntN(20) + 10
 		ufoSeen := false
+		maxKills := 0
 
 		for frame := 0; frame < 20000; frame++ {
 			g.Player.Invulnerable = 1 << 20
@@ -141,9 +140,12 @@ func TestSoakLongGame(t *testing.T) {
 			if g.UFOActive {
 				ufoSeen = true
 			}
+			if g.KillCount > maxKills {
+				maxKills = g.KillCount
+			}
 		}
-		if !ufoSeen {
-			t.Fatalf("seed %d: UFO never appeared in 20000 frames", seed)
+		if maxKills >= UFOSpawnKills && !ufoSeen {
+			t.Fatalf("seed %d: reached %d kills without UFO", seed, maxKills)
 		}
 	}
 }

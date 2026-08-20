@@ -72,8 +72,18 @@ func drawEntities() {
 
 	ctx.Set("fillStyle", "#808080")
 	for i := range g.Barricades {
-		x, y, w, h := g.Barricades[i].Rect()
-		ctx.Call("fillRect", x, y, w, h)
+		bar := &g.Barricades[i]
+		if bar.Destroyed() {
+			continue
+		}
+		for r := range bar.Pixels {
+			for c := range bar.Pixels[r] {
+				if !bar.Pixels[r][c] {
+					continue
+				}
+				ctx.Call("fillRect", bar.X+c*2, bar.Y+r*2, 2, 2)
+			}
+		}
 	}
 
 	if g.UFOActive {

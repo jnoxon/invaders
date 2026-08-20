@@ -21,7 +21,7 @@ func (g *Game) checkPlayerBulletHits() {
 		if g.UFOActive {
 			ux, uy, uw, uh := g.UFO.Rect()
 			if AABB(bx, by, bw, bh, ux, uy, uw, uh) {
-				g.AddScore(g.UFO.Points)
+				g.AddScore(g.UFO.Points())
 				g.UFOActive = false
 				b.Active = false
 				continue
@@ -42,6 +42,7 @@ func (g *Game) hitInvader(bx, by, bw, bh int) bool {
 			}
 			if AABB(bx, by, bw, bh, iv.X, iv.Y, InvaderW, InvaderH) {
 				iv.Alive = false
+				g.KillCount++
 				g.AddScore(iv.Type.Points())
 				return true
 			}
@@ -53,12 +54,15 @@ func (g *Game) hitInvader(bx, by, bw, bh int) bool {
 func (g *Game) hitBarricade(bx, by, bw, bh int) bool {
 	for i := range g.Barricades {
 		bar := &g.Barricades[i]
+		if bar.Destroyed() {
+			continue
+		}
 		x, y, w, h := bar.Rect()
 		if !AABB(bx, by, bw, bh, x, y, w, h) {
 			continue
 		}
 		if bar.PixelAt(bx+bw/2, by) {
-			bar.Damage(bx+bw/2, by)
+			bar.Damage(bx+bw/2, by, g.RNG)
 			return true
 		}
 	}
@@ -95,9 +99,13 @@ func (g *Game) checkInvaderBarricadeCollision() {
 				continue
 			}
 			for i := range g.Barricades {
-				x, y, w, h := g.Barricades[i].Rect()
+				bar := &g.Barricades[i]
+				if bar.Destroyed() {
+					continue
+				}
+				x, y, w, h := bar.Rect()
 				if AABB(iv.X, iv.Y, InvaderW, InvaderH, x, y, w, h) {
-					g.Barricades[i].ClearOverlapping(iv.X, iv.Y, InvaderW, InvaderH)
+					bar.OverlapRect(iv.X, iv.Y, InvaderW, InvaderH)
 				}
 			}
 		}

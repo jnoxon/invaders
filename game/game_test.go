@@ -119,7 +119,7 @@ func TestSeededRNGIsDeterministic(t *testing.T) {
 	g2 := newTestGame()
 	u1 := NewUFO(g1.RNG)
 	u2 := NewUFO(g2.RNG)
-	if u1.X != u2.X || u1.Dir != u2.Dir || u1.Points != u2.Points {
+	if u1.X != u2.X || u1.Dir != u2.Dir || u1.Points() != u2.Points() {
 		t.Fatalf("RNG not deterministic: %+v vs %+v", u1, u2)
 	}
 }
@@ -181,22 +181,145 @@ func TestLevelCompleteTriggersTransition(t *testing.T) {
 	}
 }
 
-func TestUFOSpawnAfterExpectedFrames(t *testing.T) {
+// killOne kills one alive invader with a player bullet, exercising the
+// real hit path (score, KillCount, spawn check).
+func killOne(t *testing.T, g *Game) {
+	t.Helper()
+	if g.Invaders.AliveCount() == 0 {
+		t.Fatal("no invaders left to kill")
+	}
+	for r := range g.Invaders.Invaders {
+		for c := range g.Invaders.Invaders[r] {
+			iv := &g.Invaders.Invaders[r][c]
+			if !iv.Alive {
+				continue
+			}
+			g.Bullets = []Bullet{{X: iv.X + 2, Y: iv.Y + 2, Owner: BulletPlayer, Active: true}}
+			g.CheckCollisions()
+			if iv.Alive {
+				t.Fatalf("invader (%d,%d) still alive after bullet", r, c)
+			}
+			return
+		}
+	}
+}
+
+func TestUFOSpawnsAtTwentyKills(t *testing.T) {
 	g := newTestGame()
 	g.State = StatePlaying
-	// Invulnerable so the long sim can't end in a game over.
-	g.Player.Invulnerable = UFOSpawnFrames + 100
-	for i := range UFOSpawnFrames - 1 {
-		g.Tick()
+	for i := 1; i < UFOSpawnKills; i++ {
+		killOne(t, g)
 		if g.UFOActive {
-			t.Fatalf("UFO active at frame %d, want %d", i+1, UFOSpawnFrames)
+			t.Fatalf("UFO active after %d kills, want %d", i, UFOSpawnKills)
+		}
+	}
+	killOne(t, g)
+	if g.KillCount != UFOSpawnKills {
+		t.Fatalf("kill count = %d, want %d", g.KillCount, UFOSpawnKills)
+	}
+	g.trySpawnUFO()
+	if !g.UFOActive {
+		t.Fatal("UFO should be active after 20 kills")
+	}
+	if !validUFOPoints[g.UFO.Points()] {
+		t.Fatalf("ufo points = %d not valid", g.UFO.Points())
+	}
+}
+
+func TestUFODoesNotSpawnBelowTenAlive(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	// Silently kill 46 invaders, leaving UFOMinAlive-1 alive.
+	n := 0
+	for r := range g.Invaders.Invaders {
+		for c := range g.Invaders.Invaders[r] {
+			if n < InvaderRows*InvaderCols-UFOMinAlive {
+				g.Invaders.Invaders[r][c].Alive = false
+				n++
+			}
+		}
+	}
+	g.KillCount = UFOSpawnKills - 1
+	killOne(t, g)
+	if g.KillCount != UFOSpawnKills {
+		t.Fatalf("kill count = %d, want %d", g.KillCount, UFOSpawnKills)
+	}
+	g.trySpawnUFO()
+	if g.UFOActive {
+		t.Fatal("UFO should not spawn with fewer than 10 invaders alive")
+	}
+}
+
+func TestKillCountResetsOnLevelStart(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	g.Player.Invulnerable = 300
+	for range 25 {
+		killOne(t, g)
+	}
+	if g.KillCount != 25 {
+		t.Fatalf("kill count = %d, want 25", g.KillCount)
+	}
+	for r := range g.Invaders.Invaders {
+		for c := range g.Invaders.Invaders[r] {
+			g.Invaders.Invaders[r][c].Alive = false
 		}
 	}
 	g.Tick()
-	if !g.UFOActive {
-		t.Fatal("UFO should be active after UFOSpawnFrames")
+	if g.State != StateLevelTransition {
+		t.Fatalf("state = %v, want StateLevelTransition", g.State)
 	}
+	g.TransitionTimer = 1
+	g.Tick()
 	if g.State != StatePlaying {
 		t.Fatalf("state = %v, want StatePlaying", g.State)
+	}
+	if g.KillCount != 0 {
+		t.Fatalf("kill count = %d, want 0 after level start", g.KillCount)
+	}
+	if g.ufoNextKill != UFOSpawnKills {
+		t.Fatalf("ufo threshold = %d, want %d", g.ufoNextKill, UFOSpawnKills)
+	}
+}
+
+func TestFullLevelAllInvadersKilledTransitions(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	g.Player.Invulnerable = 1000
+	for range InvaderRows * InvaderCols {
+		killOne(t, g)
+	}
+	if g.KillCount != InvaderRows*InvaderCols {
+		t.Fatalf("kill count = %d, want %d", g.KillCount, InvaderRows*InvaderCols)
+	}
+	g.Tick()
+	if g.State != StateLevelTransition {
+		t.Fatalf("state = %v, want StateLevelTransition", g.State)
+	}
+	if g.TransitionTimer != TransitionFrames {
+		t.Fatalf("transition timer = %d, want %d", g.TransitionTimer, TransitionFrames)
+	}
+}
+
+func TestBarricadeErosionOverMultipleHits(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	bar := &g.Barricades[0]
+	count := bar.PixelCount()
+	// Five filled pixels, pairwise non-adjacent, so each hit clears exactly
+	// the hit pixel plus one neighbor and never erases a later target.
+	hits := [][2]int{{1, 0}, {4, 0}, {7, 0}, {1, 2}, {4, 2}}
+	for i, h := range hits {
+		sx := bar.X + 2*h[0]
+		sy := bar.Y + 2*h[1]
+		g.Bullets = []Bullet{{X: sx - 1, Y: sy, Owner: BulletPlayer, Active: true}}
+		g.CheckCollisions()
+		if g.Bullets[0].Active {
+			t.Fatalf("hit %d: bullet should be consumed", i)
+		}
+		count -= 2
+		if got := bar.PixelCount(); got != count {
+			t.Fatalf("hit %d: pixel count = %d, want %d", i, got, count)
+		}
 	}
 }

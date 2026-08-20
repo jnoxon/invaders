@@ -41,7 +41,10 @@ type Game struct {
 	RNG             *rand.Rand
 	Input           InputState
 
-	ufoTimer int
+	// KillCount is the number of invaders killed this level.
+	KillCount int
+	// ufoNextKill is the kill count at which the next UFO may spawn.
+	ufoNextKill int
 }
 
 func NewGame() *Game {
@@ -93,6 +96,7 @@ func (g *Game) updatePlaying() {
 	g.updateBullets()
 	g.updateUFO()
 	g.CheckCollisions()
+	g.trySpawnUFO()
 
 	if g.Player.Invulnerable > 0 {
 		g.Player.Invulnerable--
@@ -151,19 +155,23 @@ func (g *Game) updateBullets() {
 }
 
 func (g *Game) updateUFO() {
-	if g.UFOActive {
-		g.UFO.Update()
-		if !g.UFO.Active {
-			g.UFOActive = false
-			g.ufoTimer = 0
-		}
+	if !g.UFOActive {
 		return
 	}
-	g.ufoTimer++
-	if g.ufoTimer >= UFOSpawnFrames {
-		g.ufoTimer = 0
+	g.UFO.Update()
+	if !g.UFO.Active {
+		g.UFOActive = false
+	}
+}
+
+// trySpawnUFO spawns a UFO once the kill count reaches the next multiple of
+// UFOSpawnKills. The threshold advances on each spawn so a stalled kill
+// count never re-spawns the UFO right after it leaves the screen.
+func (g *Game) trySpawnUFO() {
+	if g.KillCount >= g.ufoNextKill && g.UFO.CanSpawn(g.Invaders.AliveCount()) {
 		g.UFO = NewUFO(g.RNG)
 		g.UFOActive = true
+		g.ufoNextKill += UFOSpawnKills
 	}
 }
 
@@ -188,7 +196,8 @@ func (g *Game) resetLevelEntities() {
 	g.Bullets = g.Bullets[:0]
 	g.UFO = UFO{}
 	g.UFOActive = false
-	g.ufoTimer = 0
+	g.KillCount = 0
+	g.ufoNextKill = UFOSpawnKills
 }
 
 func (g *Game) HandleInput(code string, pressed bool) {

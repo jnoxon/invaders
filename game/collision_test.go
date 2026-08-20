@@ -122,7 +122,7 @@ func TestBulletHitsUFO(t *testing.T) {
 	// Clear the formation: the UFO shares the top rows with the grid, and
 	// hitInvader runs before the UFO check.
 	killAllBut(&g.Invaders, 0)
-	g.UFO = UFO{X: 100, Y: UFOY, Dir: 1, Active: true, Points: 100}
+	g.UFO = UFO{X: 100, Y: UFOY, Dir: 1, Active: true, points: 100}
 	g.UFOActive = true
 	g.Bullets = []Bullet{{X: 110, Y: UFOY + 2, Owner: BulletPlayer, Active: true}}
 	g.checkPlayerBulletHits()
@@ -201,5 +201,68 @@ func TestBulletHitsFirstTargetOnly(t *testing.T) {
 	}
 	if !bar.Pixels[2][4] {
 		t.Fatal("barricade should be undamaged (invader hit first)")
+	}
+}
+
+func TestPlayerBulletPassesDestroyedBarricade(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	bar := &g.Barricades[0]
+	for r := range bar.Pixels {
+		for c := range bar.Pixels[r] {
+			bar.Pixels[r][c] = false
+		}
+	}
+	if !bar.Destroyed() {
+		t.Fatal("barricade should be destroyed")
+	}
+	g.Bullets = []Bullet{{X: bar.X, Y: bar.Y, Owner: BulletPlayer, Active: true}}
+	g.checkPlayerBulletHits()
+	if !g.Bullets[0].Active {
+		t.Fatal("bullet should pass through a destroyed barricade")
+	}
+}
+
+func TestEnemyBulletPassesErasedPixel(t *testing.T) {
+	g := newTestGame()
+	g.State = StatePlaying
+	lives := g.Lives
+	bar := g.Barricades[0]
+	sx := bar.X + 2
+	// First shot erases the top pixel at col 1.
+	g.Bullets = []Bullet{{X: sx - 1, Y: bar.Y, Owner: BulletEnemy, Active: true}}
+	g.checkEnemyBulletHits()
+	if g.Bullets[0].Active {
+		t.Fatal("first bullet should be consumed by the barricade")
+	}
+	if bar.Pixels[0][1] {
+		t.Fatal("top pixel should be erased")
+	}
+	// Second shot through the same point passes through the crater.
+	g.Bullets = []Bullet{{X: sx - 1, Y: bar.Y, Owner: BulletEnemy, Active: true}}
+	g.checkEnemyBulletHits()
+	if !g.Bullets[0].Active {
+		t.Fatal("second bullet should pass through the erased pixel")
+	}
+	if g.Lives != lives {
+		t.Fatal("player should not lose a life")
+	}
+}
+
+func TestInvaderPartiallyErodesBarricade(t *testing.T) {
+	g := newTestGame()
+	bar := &g.Barricades[0]
+	// Invader covers rows 4-7, cols 6-10 of the pixel grid: only the
+	// right leg (cols 7-8, rows 4-7) is set there.
+	g.Invaders.Invaders[0][0] = Invader{X: bar.X + 12, Y: bar.Y + 8, Type: InvaderCrab, Alive: true}
+	g.checkInvaderBarricadeCollision()
+	if bar.Pixels[4][7] || bar.Pixels[7][8] {
+		t.Fatal("overlapping right-leg pixels should be cleared")
+	}
+	if !bar.Pixels[0][1] || !bar.Pixels[4][1] {
+		t.Fatal("non-overlapping pixels should remain")
+	}
+	if got := bar.PixelCount(); got != 40 {
+		t.Fatalf("pixel count = %d, want 40", got)
 	}
 }
