@@ -59,7 +59,7 @@
   loading.remove();
 
   function frame() {
-    if (window.main) main.tick();
+    if (window.main) main.tick(performance.now());
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
