@@ -10,7 +10,7 @@ A working game that:
 - Runs at 60 FPS in Chrome/Firefox/Safari via `index.html`
 - Faithfully replicates core Atari Space Invaders mechanics
 - Has a clean Go codebase with >80% test coverage on game logic
-- Builds with a single `./build.sh` command
+- Builds with a single `make` command
 - No external Go dependencies (stdlib + `js/wasm` only)
 
 ## Architecture
@@ -165,7 +165,7 @@ invaders/
   The glue and the wasm must come from the same Go version.
 - `make test`: Runs `go test` on the pure-Go packages (`game/`, `render/`, ...).
 - `make vet`: Runs `go vet` on the pure-Go packages.
-- `make serve`: Serves the project root on `localhost:8080`.
+- `make serve`: Serves the project root on `0.0.0.0:9090`.
 - `make clean`: Removes `main.wasm` and `wasm_exec.js`.
 - `wasm_exec.js` is Go's generated JS glue (not hand-written) — always copy from GOROOT, never edit.
 - Build invocation is `GOOS=js GOARCH=wasm go build -o main.wasm .` (output the `.wasm`, not `.js`).
@@ -182,4 +182,4 @@ invaders/
 Each phase (see `prompts/`) must leave the project in a buildable, testable state:
 - `go build ./...` succeeds
 - `go test ./game/` passes (if game code exists)
-- If rendering exists: `./build.sh && ./serve.sh` shows progress
+- If rendering exists: `make && make serve` shows progress

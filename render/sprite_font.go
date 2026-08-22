@@ -26,7 +26,7 @@ func (f SpriteFont) TextWidth(s string) int {
 var PixelFont = SpriteFont{
 	W: 3, H: 5,
 	Glyphs: map[byte][5]byte{
-		'0': {5, 7, 5, 5, 7},
+		'0': {7, 5, 5, 5, 7},
 		'1': {2, 6, 2, 2, 7},
 		'2': {7, 1, 7, 4, 7},
 		'3': {7, 1, 3, 1, 7},

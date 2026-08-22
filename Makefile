@@ -2,14 +2,14 @@ GOOS   := js
 GOARCH := wasm
 WASM   := main.wasm
 GLUE   := wasm_exec.js
-PORT   := 8080
+PORT   := 9090
 
 .PHONY: all build test vet serve clean
 
 all: build
 
 build:
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(WASM) .
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "-s -w" -o $(WASM) .
 	cp -f $$(go env GOROOT)/lib/wasm/$(GLUE) $(GLUE)
 	chmod u+w $(GLUE)
 	@echo "built $(WASM) + $(GLUE)"

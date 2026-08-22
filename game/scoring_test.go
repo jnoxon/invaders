@@ -41,6 +41,18 @@ func TestUpdateHighScoreDirect(t *testing.T) {
 	}
 }
 
+func TestHighScorePersistsAcrossRestart(t *testing.T) {
+	g := newTestGame()
+	g.StartGame()
+	g.AddScore(140)
+	g.GameOver()
+	g.StartGame()
+	g.AddScore(100)
+	if g.HighScore != 140 {
+		t.Fatalf("high = %d, want 140 after restart", g.HighScore)
+	}
+}
+
 func TestInvaderPointsViaGame(t *testing.T) {
 	g := newTestGame()
 	if g.InvaderPoints(InvaderSquid) != 30 {

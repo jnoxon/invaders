@@ -31,9 +31,14 @@ func NewRenderer(c Canvas) *Renderer {
 	return &Renderer{c: c}
 }
 
-// Render clears the screen and draws the current game state.
+// Render clears the screen and draws the current game state. A positive
+// Flash fills the whole screen white (player death).
 func (r *Renderer) Render(g *game.Game) {
 	r.c.Clear()
+	if g.Flash > 0 {
+		r.c.FillRect(0, 0, game.ScreenW, game.ScreenH)
+		return
+	}
 	switch g.State {
 	case game.StateStart:
 		r.renderStart(g)
@@ -96,10 +101,28 @@ func (r *Renderer) renderGameplay(g *game.Game) {
 		}
 	}
 
+	if g.ScorePopup.Timer > 0 {
+		r.drawScorePopup(g.ScorePopup)
+	}
+
 	r.c.FillRect(0, groundY, game.ScreenW, 1)
 	for i := range g.Lives {
 		r.drawSprite(lifeIcon, 4+i*16, lifeY)
 	}
+}
+
+// drawScorePopup draws the UFO points, clamped to the screen.
+func (r *Renderer) drawScorePopup(p game.ScorePopup) {
+	s := fmt.Sprintf("%d", p.Points)
+	w := PixelFont.TextWidth(s)
+	x := p.X
+	if x+w > game.ScreenW {
+		x = game.ScreenW - w
+	}
+	if x < 0 {
+		x = 0
+	}
+	r.drawText(s, x, p.Y)
 }
 
 func (r *Renderer) drawHUD(g *game.Game) {

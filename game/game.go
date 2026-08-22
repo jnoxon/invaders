@@ -12,7 +12,32 @@ const (
 	StartLives             = 3
 	TransitionFrames       = 120
 	InvaderBottomThreshold = PlayerY - 8
+
+	DeathFlashFrames = 6
+	ScorePopupFrames = 30
 )
+
+// GameEvent is a discrete game action reported after Tick so the host can
+// react (sound, haptics) without the game package knowing about them.
+type GameEvent int
+
+const (
+	EventFire GameEvent = iota + 1
+	EventInvaderKilled
+	EventPlayerHit
+	EventUFOAppear
+	EventUFODisappear
+	EventUFOKilled
+	EventMarch
+	EventGameOver
+	EventLevelStart
+)
+
+// ScorePopup is a points readout shown where a UFO was shot down.
+type ScorePopup struct {
+	X, Y, Points int
+	Timer        int
+}
 
 type GameState int
 
@@ -41,6 +66,13 @@ type Game struct {
 	RNG             *rand.Rand
 	Input           InputState
 
+	// Events accumulates GameEvents during Tick; the host drains it.
+	Events []GameEvent
+	// Flash is the number of frames of white screen left after a player death.
+	Flash int
+	// ScorePopup shows points at a UFO kill location until Timer hits 0.
+	ScorePopup ScorePopup
+
 	// KillCount is the number of invaders killed this level.
 	KillCount int
 	// ufoNextKill is the kill count at which the next UFO may spawn.
@@ -64,6 +96,15 @@ func NewGame() *Game {
 }
 
 func (g *Game) Tick() {
+	// Decay visual timers before state updates so an effect set this tick
+	// survives a full frame, in every state (a death on the last life would
+	// otherwise freeze the flash over the game-over screen).
+	if g.Flash > 0 {
+		g.Flash--
+	}
+	if g.ScorePopup.Timer > 0 {
+		g.ScorePopup.Timer--
+	}
 	switch g.State {
 	case StateStart:
 		if g.Input.JustPressed["Enter"] {
@@ -80,6 +121,7 @@ func (g *Game) Tick() {
 		if g.TransitionTimer <= 0 {
 			g.ResetLevel()
 			g.State = StatePlaying
+			g.emit(EventLevelStart)
 		}
 	case StatePaused:
 	}
@@ -90,8 +132,11 @@ func (g *Game) Tick() {
 func (g *Game) updatePlaying() {
 	g.Player.Update(&g.Input)
 	g.tryFire()
-	if g.Invaders.Update() && g.Invaders.ShouldShoot() {
-		g.enemyShoot()
+	if g.Invaders.Update() {
+		g.emit(EventMarch)
+		if g.Invaders.ShouldShoot() {
+			g.enemyShoot()
+		}
 	}
 	g.updateBullets()
 	g.updateUFO()
@@ -120,6 +165,7 @@ func (g *Game) tryFire() {
 	}
 	if b := g.Player.Fire(); b != nil {
 		g.Bullets = append(g.Bullets, *b)
+		g.emit(EventFire)
 	}
 }
 
@@ -161,6 +207,7 @@ func (g *Game) updateUFO() {
 	g.UFO.Update()
 	if !g.UFO.Active {
 		g.UFOActive = false
+		g.emit(EventUFODisappear)
 	}
 }
 
@@ -172,6 +219,7 @@ func (g *Game) trySpawnUFO() {
 		g.UFO = NewUFO(g.RNG)
 		g.UFOActive = true
 		g.ufoNextKill += UFOSpawnKills
+		g.emit(EventUFOAppear)
 	}
 }
 
@@ -182,6 +230,7 @@ func (g *Game) StartGame() {
 	g.Player = NewPlayer()
 	g.resetLevelEntities()
 	g.State = StatePlaying
+	g.emit(EventLevelStart)
 }
 
 func (g *Game) ResetLevel() {
@@ -198,6 +247,9 @@ func (g *Game) resetLevelEntities() {
 	g.UFOActive = false
 	g.KillCount = 0
 	g.ufoNextKill = UFOSpawnKills
+	g.Flash = 0
+	g.ScorePopup = ScorePopup{}
+	g.Events = nil
 }
 
 func (g *Game) HandleInput(code string, pressed bool) {
@@ -220,4 +272,9 @@ func (g *Game) CheckCollisions() {
 func (g *Game) GameOver() {
 	g.State = StateGameOver
 	g.UpdateHighScore()
+	g.emit(EventGameOver)
+}
+
+func (g *Game) emit(e GameEvent) {
+	g.Events = append(g.Events, e)
 }

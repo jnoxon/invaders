@@ -11,6 +11,8 @@ func (g *Game) InvaderPoints(t InvaderType) int {
 
 func (g *Game) HandlePlayerDeath() {
 	g.Lives--
+	g.Flash = DeathFlashFrames
+	g.emit(EventPlayerHit)
 	if g.Lives <= 0 {
 		g.GameOver()
 		return

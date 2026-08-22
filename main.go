@@ -3,47 +3,58 @@
 package main
 
 import (
+	"strconv"
 	"syscall/js"
 
+	"invaders/audio"
 	"invaders/game"
 	"invaders/render"
 )
 
 const tickMs = 1000.0 / 60.0
 
+const highScoreKey = "si-highscore"
+
 var (
 	ctx js.Value
 	g   *game.Game
 	r   *render.Renderer
+	au  *audio.Audio
+	buf *render.Buffer
+
+	jsPix js.Value
+	jsImg js.Value
 
 	lastMs  float64
 	accumMs float64
+
+	lastHigh int
 )
-
-// jsCanvas adapts the canvas 2D context to render.Canvas. fillStyle is
-// managed by Clear: black while clearing, white for everything after.
-type jsCanvas struct{}
-
-func (jsCanvas) Clear() {
-	ctx.Set("fillStyle", "#000000")
-	ctx.Call("fillRect", 0, 0, game.ScreenW, game.ScreenH)
-	ctx.Set("fillStyle", "#FFFFFF")
-}
-
-func (jsCanvas) FillRect(x, y, w, h int) {
-	ctx.Call("fillRect", x, y, w, h)
-}
 
 func main() {
 	g = game.NewGame()
+	loadHighScore()
 
 	canvas := js.Global().Get("document").Call("getElementById", "game")
 	ctx = canvas.Call("getContext", "2d")
-	r = render.NewRenderer(jsCanvas{})
+
+	buf = render.NewBuffer()
+	r = render.NewRenderer(buf)
+	au = audio.NewAudio()
+
+	// One persistent Uint8ClampedArray + ImageData per frame: the framebuffer
+	// is copied into it and uploaded with a single putImageData call.
+	jsPix = js.Global().Get("Uint8ClampedArray").New(len(buf.Pix()))
+	jsImg = js.Global().Get("ImageData").New(jsPix, game.ScreenW, game.ScreenH)
 
 	obj := js.Global().Get("Object").New()
 	obj.Set("tick", js.FuncOf(tick))
 	obj.Set("setKey", js.FuncOf(setKey))
+	obj.Set("state", js.FuncOf(stateNow))
+	obj.Set("unlock", js.FuncOf(func(js.Value, []js.Value) any {
+		au.Enable()
+		return nil
+	}))
 	js.Global().Set("main", obj)
 
 	select {}
@@ -63,13 +74,92 @@ func tick(this js.Value, args []js.Value) any {
 	}
 	for accumMs >= tickMs {
 		g.Tick()
+		playEvents()
+		saveHighScore()
 		accumMs -= tickMs
 	}
 	r.Render(g)
+	upload()
 	return nil
 }
 
+// playEvents sounds the effects for events emitted since the last tick and
+// drains the queue.
+func playEvents() {
+	for _, e := range g.Events {
+		switch e {
+		case game.EventFire:
+			au.PlayFire()
+		case game.EventInvaderKilled:
+			au.PlayInvaderKill()
+		case game.EventPlayerHit:
+			au.PlayPlayerHit()
+		case game.EventUFOAppear:
+			au.PlayUFOStart()
+		case game.EventUFODisappear:
+			au.PlayUFOEnd()
+		case game.EventUFOKilled:
+			au.PlayUFOEnd()
+			au.PlayUFOHit()
+		case game.EventMarch:
+			au.PlayMarch()
+		case game.EventGameOver:
+			au.PlayGameOver()
+		}
+	}
+	g.Events = nil
+}
+
 func setKey(this js.Value, args []js.Value) any {
-	g.HandleInput(args[0].String(), args[1].Bool())
+	code := args[0].String()
+	pressed := args[1].Bool()
+	if pressed {
+		if code == "Enter" {
+			au.Enable()
+		}
+		if code == "KeyM" {
+			au.ToggleMute()
+		}
+	}
+	g.HandleInput(code, pressed)
 	return nil
+}
+
+// stateNow exposes a game snapshot for QA debugging.
+func stateNow(js.Value, []js.Value) any {
+	return map[string]any{
+		"state":    int(g.State),
+		"lives":    g.Lives,
+		"flash":    g.Flash,
+		"score":    g.Score,
+		"level":    g.Level,
+		"frame":    g.Frame,
+		"invaders": g.Invaders.AliveCount(),
+		"playerX":  g.Player.X,
+		"playerOk": g.Player.Alive,
+		"ufo":      g.UFOActive,
+	}
+}
+
+// upload pushes the framebuffer to the canvas.
+func upload() {
+	pix := buf.Pix()
+	js.CopyBytesToJS(jsPix, pix)
+	ctx.Call("putImageData", jsImg, 0, 0)
+}
+
+// loadHighScore restores the persisted high score, if any.
+func loadHighScore() {
+	v := js.Global().Get("localStorage").Call("getItem", highScoreKey).String()
+	if n, err := strconv.Atoi(v); err == nil {
+		g.HighScore = n
+	}
+}
+
+// saveHighScore persists the high score when it changes.
+func saveHighScore() {
+	if g.HighScore != lastHigh {
+		lastHigh = g.HighScore
+		js.Global().Get("localStorage").Call("setItem", highScoreKey, strconv.Itoa(g.HighScore))
+	}
 }

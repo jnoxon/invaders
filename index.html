@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Space Invaders</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8'%3E%3Cpath fill='%2300ff41' d='M2 0h1v1H2zM8 0h1v1H8zM3 1h1v1H3zM7 1h1v1H7zM2 2h7v1H2zM1 3h2v1H1zM4 3h3v1H4zM8 3h2v1H8zM0 4h11v1H0zM0 5h2v1H0zM3 5h5v1H3zM8 5h2v1H8zM0 6h1v1H0zM2 6h7v1H2zM10 6h1v1H10zM3 7h2v1H3zM6 7h2v1H6z'/%3E%3C/svg%3E"/>
 <style>
   html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
@@ -13,7 +14,8 @@
     image-rendering: crisp-edges;
     box-shadow: 0 0 48px rgba(0,0,0,0.8);
   }
-  #loading { position: fixed; top: 10px; left: 12px; color: #7f7; font: 12px/1.4 monospace; }
+  #loading { position: fixed; top: 10px; left: 12px; color: #7f7; font: 12px/1.4 monospace; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
 </style>
 </head>
 <body>
@@ -38,11 +40,14 @@
 
   const handled = new Set([
     "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-    "Space", "Enter", "KeyA", "KeyD", "KeyP",
+    "Space", "Enter", "KeyA", "KeyD", "KeyP", "KeyM",
   ]);
+  function unlock() { if (window.main) main.unlock(); }
+  window.addEventListener("pointerdown", unlock);
   window.addEventListener("keydown", (e) => {
     if (!handled.has(e.code)) return;
     e.preventDefault();
+    unlock();
     if (e.repeat) return;
     if (window.main) main.setKey(e.code, true);
   });

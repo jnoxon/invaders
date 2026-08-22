@@ -139,7 +139,7 @@ Add procedural sound effects via Web Audio API, optimize rendering performance, 
 - [ ] `go build ./...` succeeds
 - [ ] `go test ./...` passes all tests
 - [ ] `go test ./game/ -cover` reports >85%
-- [ ] `./build.sh && ./serve.sh` → complete playable game in browser
+- [ ] `make && make serve` → complete playable game in browser
 - [ ] All sounds play procedurally (no audio files)
 - [ ] 60 FPS sustained (no frame drops with full entity count)
 - [ ] Game feel: responsive input, satisfying audio, visual feedback (flash, popup)
@@ -173,8 +173,8 @@ Add procedural sound effects via Web Audio API, optimize rendering performance, 
 ```bash
 go build ./...
 go test ./... -v -cover
-./build.sh
-./serve.sh &
+make
+make serve &
 # Browser: play a full game through multiple levels
 # Check: audio, performance (dev tools), all game states, edge cases
 # Compare to original: https://en.wikipedia.org/wiki/Space_Invaders

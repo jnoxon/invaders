@@ -21,9 +21,17 @@ func (g *Game) checkPlayerBulletHits() {
 		if g.UFOActive {
 			ux, uy, uw, uh := g.UFO.Rect()
 			if AABB(bx, by, bw, bh, ux, uy, uw, uh) {
-				g.AddScore(g.UFO.Points())
+				pts := g.UFO.Points()
+				g.AddScore(pts)
+				g.ScorePopup = ScorePopup{
+					X:      g.UFO.X,
+					Y:      g.UFO.Y,
+					Points: pts,
+					Timer:  ScorePopupFrames,
+				}
 				g.UFOActive = false
 				b.Active = false
+				g.emit(EventUFOKilled)
 				continue
 			}
 		}
@@ -44,6 +52,7 @@ func (g *Game) hitInvader(bx, by, bw, bh int) bool {
 				iv.Alive = false
 				g.KillCount++
 				g.AddScore(iv.Type.Points())
+				g.emit(EventInvaderKilled)
 				return true
 			}
 		}

@@ -96,7 +96,7 @@ func TestUFOCanSpawn(t *testing.T) {
 	}{
 		{"inactive with ten alive", false, UFOMinAlive, true},
 		{"inactive with full grid", false, InvaderRows * InvaderCols, true},
-		{"inactive with nine alive", false, UFOMinAlive-1, false},
+		{"inactive with nine alive", false, UFOMinAlive - 1, false},
 		{"inactive with none alive", false, 0, false},
 		{"active with full grid", true, InvaderRows * InvaderCols, false},
 		{"active with none alive", true, 0, false},
