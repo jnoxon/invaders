@@ -152,6 +152,7 @@ func (f *fakeBackend) tone(t Tone, at time.Duration) {
 func (f *fakeBackend) noise(d time.Duration, g float64) { f.noiseN++; f.noiseDur, f.noiseGain = d, g }
 func (f *fakeBackend) warbleStart()                     { f.warbleOn++ }
 func (f *fakeBackend) warbleStop()                      { f.warbleOff++ }
+func (f *fakeBackend) state() string                    { return "running" }
 
 func TestPlayMethodsRouteToBackend(t *testing.T) {
 	b := &fakeBackend{}

@@ -28,6 +28,9 @@ type Renderer struct {
 	// Version is shown in the corner of the start screen; the host
 	// fills it with the VCS-embedded build hash.
 	Version string
+	// AudioState is a start-screen warning shown when the audio context is
+	// not running (e.g. iOS autoplay blocking); the host sets it.
+	AudioState string
 }
 
 func NewRenderer(c Canvas) *Renderer {
@@ -153,6 +156,10 @@ func (r *Renderer) renderStart(g *game.Game) {
 	}
 	if r.Version != "" {
 		r.drawText(r.Version, 2, 206)
+	}
+	if r.AudioState != "" {
+		s := "AUDIO: " + r.AudioState
+		r.drawText(s, game.ScreenW-PixelFont.TextWidth(s)-2, 206)
 	}
 }
 

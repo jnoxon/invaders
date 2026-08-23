@@ -9,9 +9,9 @@ import (
 	"unsafe"
 )
 
-// jsBackend drives the Web Audio API. The AudioContext is created at init
-// but stays suspended until a user gesture; resume() (via Audio.Enable)
-// starts it.
+// jsBackend drives the Web Audio API. The AudioContext is created on the
+// first resume, inside a user gesture: iOS permanently suspends contexts
+// created before the page's first interaction.
 type jsBackend struct {
 	ctx       js.Value
 	warbleOsc js.Value
@@ -20,17 +20,17 @@ type jsBackend struct {
 }
 
 func newBackend() backend {
+	return &jsBackend{ctx: js.Undefined()}
+}
+
+// create instantiates the AudioContext. Called from a user-gesture path.
+func (b *jsBackend) create() {
 	ctor := js.Global().Get("AudioContext")
 	if ctor.IsUndefined() {
 		ctor = js.Global().Get("webkitAudioContext")
 	}
-	if ctor.IsUndefined() {
-		return &jsBackend{}
-	}
-	return &jsBackend{
-		ctx:       ctor.New(),
-		warbleOsc: js.Undefined(),
-		warbleLfo: js.Undefined(),
+	if !ctor.IsUndefined() {
+		b.ctx = ctor.New()
 	}
 }
 
@@ -39,9 +39,19 @@ func (b *jsBackend) ok() bool {
 }
 
 func (b *jsBackend) resume() {
+	if !b.ok() {
+		b.create()
+	}
 	if b.ok() && b.ctx.Get("state").String() == "suspended" {
 		b.ctx.Call("resume")
 	}
+}
+
+func (b *jsBackend) state() string {
+	if !b.ok() {
+		return ""
+	}
+	return b.ctx.Get("state").String()
 }
 
 // tone schedules a single oscillator note with a linear gain ramp to zero.

@@ -13,5 +13,6 @@ func (nullBackend) tone(Tone, time.Duration)     {}
 func (nullBackend) noise(time.Duration, float64) {}
 func (nullBackend) warbleStart()                 {}
 func (nullBackend) warbleStop()                  {}
+func (nullBackend) state() string                { return "" }
 
 func newBackend() backend { return nullBackend{} }

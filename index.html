@@ -177,6 +177,11 @@
   const inMenu = (st) => st && (st.stateName === "start" || st.stateName === "gameover");
 
   function unlock() { if (window.main) main.unlock(); }
+  // iOS re-suspends the audio context when the tab is backgrounded; once
+  // the tab has been unlocked by a gesture, a plain resume works on return.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") unlock();
+  });
   // Window-level: the first press unlocks audio. In the menus, a press
   // anywhere except the top bar acts as Enter.
   let menuPointerId = null;

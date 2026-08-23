@@ -113,6 +113,12 @@ func tick(this js.Value, args []js.Value) any {
 		saveHighScore()
 		accumMs -= tickMs
 	}
+	// Surface a stuck audio context on the start screen.
+	if st := au.State(); st != "" && st != "running" {
+		r.AudioState = strings.ToUpper(st)
+	} else {
+		r.AudioState = ""
+	}
 	r.Render(g)
 	upload()
 	return nil
@@ -175,6 +181,7 @@ func stateNow(js.Value, []js.Value) any {
 		"playerOk":  g.Player.Alive,
 		"ufo":       g.UFOActive,
 		"muted":     au.Muted,
+		"audio":     au.State(),
 		"stateName": stateName(g.State),
 	}
 }

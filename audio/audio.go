@@ -65,6 +65,7 @@ type backend interface {
 	noise(dur time.Duration, gain float64)
 	warbleStart()
 	warbleStop()
+	state() string
 }
 
 // Audio plays procedural sound effects. All methods are safe on a nil
@@ -84,13 +85,23 @@ func NewAudio() *Audio {
 }
 
 // Enable turns playback on and resumes the audio context. Browsers only
-// allow this after a user gesture, so call it on the first keypress.
+// allow resuming after a user gesture; calling it on every gesture is safe
+// and retries the resume while the context is still suspended.
 func (a *Audio) Enable() {
-	if a == nil || a.Enabled {
+	if a == nil {
 		return
 	}
 	a.Enabled = true
 	a.b.resume()
+}
+
+// State reports the context state ("suspended", "running", ...), or ""
+// when there is no backend or no context yet.
+func (a *Audio) State() string {
+	if a == nil {
+		return ""
+	}
+	return a.b.state()
 }
 
 // ToggleMute flips the mute flag.

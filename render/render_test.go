@@ -338,6 +338,25 @@ func TestRenderStartVersion(t *testing.T) {
 	}
 }
 
+func TestRenderStartAudioWarning(t *testing.T) {
+	g := game.NewGame()
+	g.Frame = 0
+
+	m := &mockCanvas{}
+	NewRenderer(m).Render(g)
+	if n := m.countInY(206, 214); n != 0 {
+		t.Errorf("no warning: %d rects in warning band, want 0", n)
+	}
+
+	m = &mockCanvas{}
+	r := NewRenderer(m)
+	r.AudioState = "SUSPENDED"
+	r.Render(g)
+	if n := m.countInY(206, 214); n == 0 {
+		t.Error("audio warning not drawn")
+	}
+}
+
 func gameplayGame() *game.Game {
 	g := game.NewGame()
 	g.State = game.StatePlaying
