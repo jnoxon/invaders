@@ -50,6 +50,8 @@ func main() {
 	obj := js.Global().Get("Object").New()
 	obj.Set("tick", js.FuncOf(tick))
 	obj.Set("setKey", js.FuncOf(setKey))
+	obj.Set("move", js.FuncOf(move))
+	obj.Set("moveEnd", js.FuncOf(moveEnd))
 	obj.Set("state", js.FuncOf(stateNow))
 	obj.Set("unlock", js.FuncOf(func(js.Value, []js.Value) any {
 		au.Enable()
@@ -128,17 +130,49 @@ func setKey(this js.Value, args []js.Value) any {
 // stateNow exposes a game snapshot for QA debugging.
 func stateNow(js.Value, []js.Value) any {
 	return map[string]any{
-		"state":    int(g.State),
-		"lives":    g.Lives,
-		"flash":    g.Flash,
-		"score":    g.Score,
-		"level":    g.Level,
-		"frame":    g.Frame,
-		"invaders": g.Invaders.AliveCount(),
-		"playerX":  g.Player.X,
-		"playerOk": g.Player.Alive,
-		"ufo":      g.UFOActive,
+		"state":     int(g.State),
+		"lives":     g.Lives,
+		"flash":     g.Flash,
+		"score":     g.Score,
+		"level":     g.Level,
+		"frame":     g.Frame,
+		"invaders":  g.Invaders.AliveCount(),
+		"bullets":   len(g.Bullets),
+		"playerX":   g.Player.X,
+		"playerOk":  g.Player.Alive,
+		"ufo":       g.UFOActive,
+		"muted":     au.Muted,
+		"stateName": stateName(g.State),
 	}
+}
+
+// stateName maps a game state to its QA/debug name.
+func stateName(s game.GameState) string {
+	switch s {
+	case game.StateStart:
+		return "start"
+	case game.StatePlaying:
+		return "playing"
+	case game.StatePaused:
+		return "paused"
+	case game.StateLevelTransition:
+		return "level"
+	case game.StateGameOver:
+		return "gameover"
+	}
+	return "unknown"
+}
+
+// move forwards a touch drag delta in logical pixels to the game.
+func move(this js.Value, args []js.Value) any {
+	g.AddMoveDx(args[0].Float())
+	return nil
+}
+
+// moveEnd drops the queued touch drag when the drag pointer lifts.
+func moveEnd(js.Value, []js.Value) any {
+	g.EndMoveDx()
+	return nil
 }
 
 // upload pushes the framebuffer to the canvas.

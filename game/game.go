@@ -1,6 +1,7 @@
 package game
 
 import (
+	"math"
 	"math/rand/v2"
 	"time"
 )
@@ -77,6 +78,8 @@ type Game struct {
 	KillCount int
 	// ufoNextKill is the kill count at which the next UFO may spawn.
 	ufoNextKill int
+	// moveDx is the queued touch drag delta in logical px; see applyMoveDx.
+	moveDx float64
 }
 
 func NewGame() *Game {
@@ -131,6 +134,7 @@ func (g *Game) Tick() {
 
 func (g *Game) updatePlaying() {
 	g.Player.Update(&g.Input)
+	g.applyMoveDx()
 	g.tryFire()
 	if g.Invaders.Update() {
 		g.emit(EventMarch)
@@ -154,6 +158,50 @@ func (g *Game) updatePlaying() {
 	if g.Invaders.AliveCount() == 0 {
 		g.HandleLevelComplete()
 	}
+}
+
+// AddMoveDx queues a touch drag delta in logical px. The fixed tick
+// consumes it; see applyMoveDx.
+func (g *Game) AddMoveDx(dx float64) {
+	g.moveDx += dx
+}
+
+// applyMoveDx consumes the queued touch drag. The rounded amount moves the
+// ship; the fractional remainder carries to the next tick. Any amount the
+// playfield clamp eats is kept as debt, so the ship tracks the anchored
+// finger target (finger minus anchor) and cannot lead it — teleporting —
+// when the edge frees up. While the player is dead the queue is dropped.
+func (g *Game) applyMoveDx() {
+	if g.moveDx == 0 {
+		return
+	}
+	if !g.Player.Alive {
+		g.moveDx = 0
+		return
+	}
+	d := int(math.Round(g.moveDx))
+	g.moveDx -= float64(d)
+	if d == 0 {
+		return
+	}
+	x := g.Player.X + d
+	if x < 0 {
+		x = 0
+	}
+	if x > ScreenW-PlayerW {
+		x = ScreenW - PlayerW
+	}
+	if applied := x - g.Player.X; applied != d {
+		g.moveDx += float64(d - applied)
+	}
+	g.Player.X = x
+}
+
+// EndMoveDx drops the queued touch drag, including clamped-edge debt. The
+// JS calls it when the drag pointer lifts so a stale gesture cannot steer
+// the next one.
+func (g *Game) EndMoveDx() {
+	g.moveDx = 0
 }
 
 func (g *Game) tryFire() {
@@ -230,6 +278,7 @@ func (g *Game) StartGame() {
 	g.Player = NewPlayer()
 	g.resetLevelEntities()
 	g.State = StatePlaying
+	g.moveDx = 0
 	g.emit(EventLevelStart)
 }
 
@@ -237,6 +286,7 @@ func (g *Game) ResetLevel() {
 	g.Level++
 	g.resetLevelEntities()
 	g.Player.Respawn()
+	g.moveDx = 0
 }
 
 func (g *Game) resetLevelEntities() {
@@ -256,10 +306,26 @@ func (g *Game) HandleInput(code string, pressed bool) {
 	g.Input.Update(code, pressed)
 	if code == "KeyP" && pressed {
 		if g.State == StatePlaying {
-			g.State = StatePaused
+			g.Pause()
 		} else if g.State == StatePaused {
-			g.State = StatePlaying
+			g.Resume()
 		}
+	}
+}
+
+// Pause suspends gameplay while active.
+func (g *Game) Pause() {
+	if g.State == StatePlaying {
+		g.State = StatePaused
+		g.moveDx = 0
+	}
+}
+
+// Resume resumes gameplay while paused.
+func (g *Game) Resume() {
+	if g.State == StatePaused {
+		g.State = StatePlaying
+		g.moveDx = 0
 	}
 }
 
@@ -272,6 +338,7 @@ func (g *Game) CheckCollisions() {
 func (g *Game) GameOver() {
 	g.State = StateGameOver
 	g.UpdateHighScore()
+	g.moveDx = 0
 	g.emit(EventGameOver)
 }
 

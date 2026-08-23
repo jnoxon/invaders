@@ -137,6 +137,47 @@ func TestPauseToggle(t *testing.T) {
 	}
 }
 
+func TestPauseResumeMethods(t *testing.T) {
+	g := playingGame()
+	g.Pause()
+	if g.State != StatePaused {
+		t.Fatalf("state = %v, want StatePaused", g.State)
+	}
+	g.Pause()
+	if g.State != StatePaused {
+		t.Fatal("pause while paused should be a no-op")
+	}
+	g.Resume()
+	if g.State != StatePlaying {
+		t.Fatalf("state = %v, want StatePlaying", g.State)
+	}
+	g.Resume()
+	if g.State != StatePlaying {
+		t.Fatal("resume while playing should be a no-op")
+	}
+	s := newTestGame()
+	s.Pause()
+	if s.State != StateStart {
+		t.Fatalf("pause in start state = %v, want StateStart", s.State)
+	}
+}
+
+func TestPauseFreezesPlayer(t *testing.T) {
+	g := playingGame()
+	g.HandleInput("ArrowLeft", true)
+	g.Pause()
+	x := g.Player.X
+	g.Tick()
+	if g.Player.X != x {
+		t.Fatalf("player moved while paused: %d -> %d", x, g.Player.X)
+	}
+	g.Resume()
+	g.Tick()
+	if g.Player.X != x-PlayerSpeed {
+		t.Fatalf("player X = %d, want %d after resume", g.Player.X, x-PlayerSpeed)
+	}
+}
+
 func TestFullGameLoop200Frames(t *testing.T) {
 	g := newTestGame()
 	g.HandleInput("Enter", true)
