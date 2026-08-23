@@ -25,6 +25,9 @@ type Canvas interface {
 // Scaling to CSS pixels is done by the host, not here.
 type Renderer struct {
 	c Canvas
+	// Version is shown in the corner of the start screen; the host
+	// fills it with the VCS-embedded build hash.
+	Version string
 }
 
 func NewRenderer(c Canvas) *Renderer {
@@ -147,6 +150,9 @@ func (r *Renderer) renderStart(g *game.Game) {
 
 	if blink(g.Frame) {
 		r.drawTextCenter("PRESS ENTER TO START", 168)
+	}
+	if r.Version != "" {
+		r.drawText(r.Version, 2, 206)
 	}
 }
 

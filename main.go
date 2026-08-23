@@ -3,7 +3,9 @@
 package main
 
 import (
+	"runtime/debug"
 	"strconv"
+	"strings"
 	"syscall/js"
 
 	"invaders/audio"
@@ -31,6 +33,36 @@ var (
 	lastHigh int
 )
 
+// buildVersion returns the short git hash stamped by the Go toolchain at
+// build time (uppercase, with a trailing "-" if the tree was dirty), or
+// "dev" when VCS stamping is unavailable.
+func buildVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "dev"
+	}
+	rev, dirty := "", ""
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value
+		}
+	}
+	if rev == "" {
+		return "dev"
+	}
+	v := strings.ToUpper(rev)
+	if len(v) > 7 {
+		v = v[:7]
+	}
+	if dirty == "true" {
+		v += "-"
+	}
+	return v
+}
+
 func main() {
 	g = game.NewGame()
 	loadHighScore()
@@ -40,6 +72,7 @@ func main() {
 
 	buf = render.NewBuffer()
 	r = render.NewRenderer(buf)
+	r.Version = buildVersion()
 	au = audio.NewAudio()
 
 	// One persistent Uint8ClampedArray + ImageData per frame: the framebuffer

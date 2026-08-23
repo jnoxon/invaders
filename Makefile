@@ -26,7 +26,7 @@ vet:
 
 serve:
 	@echo "serving on http://0.0.0.0:$(PORT) (ctrl-c to stop)"
-	python3 -m http.server $(PORT) --bind 0.0.0.0
+	python3 serve.py $(PORT)
 
 clean:
 	rm -f $(WASM) $(GLUE)

@@ -319,6 +319,25 @@ func TestRenderStartScreen(t *testing.T) {
 	}
 }
 
+func TestRenderStartVersion(t *testing.T) {
+	g := game.NewGame()
+	g.Frame = 0
+
+	m := &mockCanvas{}
+	NewRenderer(m).Render(g)
+	if n := m.countInY(206, 214); n != 0 {
+		t.Errorf("empty version: %d rects in version band, want 0", n)
+	}
+
+	m = &mockCanvas{}
+	r := NewRenderer(m)
+	r.Version = "ABC1234"
+	r.Render(g)
+	if n := m.countInY(206, 214); n == 0 {
+		t.Error("version not drawn in version band")
+	}
+}
+
 func gameplayGame() *game.Game {
 	g := game.NewGame()
 	g.State = game.StatePlaying

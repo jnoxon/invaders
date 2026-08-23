@@ -20,6 +20,7 @@ invaders/
 ├── AGENTS.md          # This file
 ├── go.mod             # Module: invaders, go 1.26.6 (toolchain auto-downloads)
 ├── Makefile           # make, make test, make vet, make serve, make clean
+├── serve.py           # No-cache static server used by make serve
 ├── index.html         # WASM loader + canvas + input wiring
 ├── main.go            # Entry: WASM init, game loop, JS interop (//go:build js && wasm)
 ├── main.wasm          # Built (gitignore)
@@ -165,7 +166,7 @@ invaders/
   The glue and the wasm must come from the same Go version.
 - `make test`: Runs `go test` on the pure-Go packages (`game/`, `render/`, ...).
 - `make vet`: Runs `go vet` on the pure-Go packages.
-- `make serve`: Serves the project root on `0.0.0.0:9090`.
+- `make serve`: Serves the project root on `0.0.0.0:9090` via `serve.py`, which sends `Cache-Control: no-store` so rebuilt artifacts are picked up immediately (python's http.server does not).
 - `make clean`: Removes `main.wasm` and `wasm_exec.js`.
 - `wasm_exec.js` is Go's generated JS glue (not hand-written) — always copy from GOROOT, never edit.
 - Build invocation is `GOOS=js GOARCH=wasm go build -o main.wasm .` (output the `.wasm`, not `.js`).
